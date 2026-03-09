@@ -1,8 +1,9 @@
+// app.js
 (function () {
-  const QUESTION_COUNT = 1;
+  const QUESTION_COUNT = 1; // changed to 1
   const BEST_SCORE_KEY = "rsq_best_percent_v1";
   const NICKNAME_KEY = "rsq_nickname_v1";
-  const PASS_MARK = 100;
+  const PASS_MARK = 80;
 
   function $(id) { return document.getElementById(id); }
 
@@ -99,9 +100,9 @@
 
     const chosen = quiz.answers.get(qObj.id);
 
-    els.progressText.textContent = `Question ${quiz.index + 1} of ${quiz.questions.length}`;
+    els.progressText.textContent = `Question 1 of 1`;
     els.scoreSoFar.innerHTML = `
-      <div>Answered: ${quiz.answers.size}/${quiz.questions.length}</div>
+      <div>Answered: ${quiz.answers.size}/1</div>
       ${bestLineHtml()}
     `;
 
@@ -128,7 +129,7 @@
     });
 
     if (typeof chosen === "number") els.nextBtn.disabled = false;
-    els.nextBtn.textContent = (quiz.index === quiz.questions.length - 1) ? "Finish" : "Next";
+    els.nextBtn.textContent = "Finish";
   }
 
   function finishQuiz() {
@@ -166,7 +167,7 @@
 
     els.reviewBlock.innerHTML = reviewItems.map((it, i) => `
       <div class="reviewItem">
-        <div><strong>Q${i + 1}.</strong> ${escapeHtml(it.q)}
+        <div><strong>Q1.</strong> ${escapeHtml(it.q)}
           <span class="badge ${it.isCorrect ? "pass" : "fail"}">${it.isCorrect ? "Correct" : "Incorrect"}</span>
         </div>
         <div><strong>Your answer:</strong> ${escapeHtml(it.selectedText)}</div>
@@ -182,13 +183,7 @@
     const qObj = quiz.questions[quiz.index];
     if (!qObj) return;
     if (!quiz.answers.has(qObj.id)) return;
-
-    if (quiz.index === quiz.questions.length - 1) {
-      finishQuiz();
-      return;
-    }
-    quiz.index += 1;
-    renderQuestion();
+    finishQuiz();
   }
 
   function restart() {
@@ -198,12 +193,10 @@
     show(els.startScreen);
   }
 
-  // Wire up
   els.startBtn.addEventListener("click", startQuiz);
   els.nextBtn.addEventListener("click", next);
   els.restartBtn.addEventListener("click", restart);
 
-  // Initialize start screen nickname + best
   if (els.nickname) els.nickname.value = getNickname();
   els.startScreen.insertAdjacentHTML("beforeend", `<p class="hint">${bestLineHtml()}</p>`);
 })();
