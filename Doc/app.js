@@ -1,8 +1,8 @@
 (function () {
-  const QUESTION_COUNT = 6;
+  const QUESTION_COUNT = 1;
   const BEST_SCORE_KEY = "rsq_best_percent_v1";
   const NICKNAME_KEY = "rsq_nickname_v1";
-  const PASS_MARK = 80;
+  const PASS_MARK = 100;
 
   function $(id) { return document.getElementById(id); }
 
