@@ -1,8 +1,7 @@
-// app.js
+// app.js (nickname is NOT saved or loaded from localStorage)
 (function () {
-  const QUESTION_COUNT = 1; // changed to 1
+  const QUESTION_COUNT = 1;
   const BEST_SCORE_KEY = "rsq_best_percent_v1";
-  const NICKNAME_KEY = "rsq_nickname_v1";
   const PASS_MARK = 80;
 
   function $(id) { return document.getElementById(id); }
@@ -44,7 +43,11 @@
     }
     return a;
   }
-  function pickN(arr, n) { return shuffle(arr).slice(0, Math.min(n, arr.length)); }
+
+  function pickN(arr, n) {
+    return shuffle(arr).slice(0, Math.min(n, arr.length));
+  }
+
   function show(el) { el.classList.remove("hidden"); }
   function hide(el) { el.classList.add("hidden"); }
 
@@ -64,9 +67,6 @@
   }
   function setBestPercent(p) { localStorage.setItem(BEST_SCORE_KEY, String(p)); }
 
-  function getNickname() { return (localStorage.getItem(NICKNAME_KEY) || "").trim(); }
-  function setNickname(n) { localStorage.setItem(NICKNAME_KEY, (n || "").trim()); }
-
   function bestLineHtml() {
     const best = getBestPercent();
     return best === null ? `<div><strong>Best:</strong> Not set</div>` : `<div><strong>Best:</strong> ${best}%</div>`;
@@ -76,7 +76,9 @@
 
   function startQuiz() {
     try {
-      setNickname(els.nickname ? els.nickname.value : "");
+      // Nickname is optional but NOT persisted
+      const nick = els.nickname ? (els.nickname.value || "").trim() : "";
+
       quiz.questions = pickN(bank, QUESTION_COUNT);
       quiz.index = 0;
       quiz.answers = new Map();
@@ -85,14 +87,14 @@
       hide(els.resultScreen);
       show(els.quizScreen);
 
-      renderQuestion();
+      renderQuestion(nick);
     } catch (e) {
       console.error("Start quiz error:", e);
       alert("Something went wrong starting the quiz. Please refresh and try again.");
     }
   }
 
-  function renderQuestion() {
+  function renderQuestion(nick) {
     const qObj = quiz.questions[quiz.index];
     if (!qObj) return;
 
@@ -100,7 +102,7 @@
 
     const chosen = quiz.answers.get(qObj.id);
 
-    els.progressText.textContent = `Question 1 of 1`;
+    els.progressText.textContent = "Question 1 of 1";
     els.scoreSoFar.innerHTML = `
       <div>Answered: ${quiz.answers.size}/1</div>
       ${bestLineHtml()}
@@ -117,6 +119,7 @@
     }).join("");
 
     els.questionBlock.innerHTML = `
+      ${nick ? `<div class="hint"><strong>Player:</strong> ${escapeHtml(nick)}</div>` : ""}
       <h2>${escapeHtml(qObj.q)}</h2>
       <div class="options">${optionsHtml}</div>
     `;
@@ -154,7 +157,7 @@
     const prevBest = getBestPercent();
     if (prevBest === null || percent > prevBest) setBestPercent(percent);
 
-    const nick = getNickname();
+    const nick = els.nickname ? (els.nickname.value || "").trim() : "";
     const whoLine = nick ? `<strong>Player:</strong> ${escapeHtml(nick)}<br />` : "";
 
     els.resultSummary.innerHTML = `
@@ -165,7 +168,7 @@
       <strong>Best:</strong> ${getBestPercent()}%
     `;
 
-    els.reviewBlock.innerHTML = reviewItems.map((it, i) => `
+    els.reviewBlock.innerHTML = reviewItems.map((it) => `
       <div class="reviewItem">
         <div><strong>Q1.</strong> ${escapeHtml(it.q)}
           <span class="badge ${it.isCorrect ? "pass" : "fail"}">${it.isCorrect ? "Correct" : "Incorrect"}</span>
@@ -189,7 +192,10 @@
   function restart() {
     hide(els.resultScreen);
     hide(els.quizScreen);
-    if (els.nickname) els.nickname.value = getNickname();
+
+    // Do not auto-fill nickname from storage; optionally clear the field:
+    if (els.nickname) els.nickname.value = "";
+
     show(els.startScreen);
   }
 
@@ -197,6 +203,6 @@
   els.nextBtn.addEventListener("click", next);
   els.restartBtn.addEventListener("click", restart);
 
-  if (els.nickname) els.nickname.value = getNickname();
+  // Initialize start screen best (nickname is not loaded)
   els.startScreen.insertAdjacentHTML("beforeend", `<p class="hint">${bestLineHtml()}</p>`);
 })();
