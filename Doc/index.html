@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick Quiz</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Quick Quiz</h1>
+      <p class="subtitle">Walk-up, self-paced. Refresh to get a new random set of 6 questions.</p>
+    </header>
+
+    <section id="startScreen" class="card">
+      <div class="row">
+        <label for="nickname"><strong>Optional: Enter your name.</strong></label>
+      </div>
+      <div class="row">
+        <input id="nickname" type="text" maxlength="24" placeholder="Nickname (optional)" />
+      </div>
+
+      <div class="row">
+        <button id="startBtn" class="primary" type="button">Start quiz</button>
+      </div>
+
+      <p class="hint">This demo stores progress only on your device (no server).</p>
+    </section>
+
+    <section id="quizScreen" class="card hidden" aria-live="polite">
+      <div class="meta">
+        <div id="progressText"></div>
+        <div id="scoreSoFar"></div>
+      </div>
+
+      <div id="questionBlock" class="questionBlock"></div>
+
+      <div class="actions">
+        <button id="nextBtn" class="primary" type="button" disabled>Next</button>
+      </div>
+    </section>
+
+    <section id="resultScreen" class="card hidden" aria-live="polite">
+      <h2>Results</h2>
+      <p id="resultSummary"></p>
+
+      <details class="review">
+        <summary>Review answers</summary>
+        <div id="reviewBlock"></div>
+      </details>
+
+      <div class="actions">
+        <button id="restartBtn" type="button">Play Again</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <small>Hosted on GitHub Pages</small>
+    </footer>
+  </main>
+
+  <script>
+    // Ensure the quiz uses 6 questions even if app.js defaults to 5
+    window.QUIZ_QUESTION_COUNT = 6;
+  </script>
+  <script src="./questions.js?v=21"></script>
+  <script src="./app.js?v=21"></script>
+</body>
+</html>
