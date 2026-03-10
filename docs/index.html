@@ -1,191 +1,62 @@
-(() => {
-  const NUM_TO_SHOW = 3;
-  const PASS_MIN_CORRECT = 2;
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick Quiz</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Quick Quiz</h1>
+      <p class="subtitle">Walk-up, self-paced. Each play shows 3 random questions.</p>
+    </header>
 
-  // Elements (match your HTML)
-  const startScreen = document.getElementById("startScreen");
-  const quizScreen = document.getElementById("quizScreen");
-  const resultScreen = document.getElementById("resultScreen");
+    <section id="startScreen" class="card">
+      <div class="row">
+        <label for="nickname"><strong>Optional: Enter your name.</strong></label>
+      </div>
+      <div class="row">
+        <input id="nickname" type="text" maxlength="24" placeholder="Nickname (optional)" />
+      </div>
 
-  const nicknameInput = document.getElementById("nickname");
-  const startBtn = document.getElementById("startBtn");
+      <div class="row">
+        <button id="startBtn" class="primary" type="button">Start</button>
+      </div>
 
-  const progressText = document.getElementById("progressText");
-  const scoreSoFar = document.getElementById("scoreSoFar");
-  const questionBlock = document.getElementById("questionBlock");
-  const nextBtn = document.getElementById("nextBtn");
+      <p class="hint">This demo stores progress only on your device (no server).</p>
+    </section>
 
-  const resultSummary = document.getElementById("resultSummary");
-  const reviewBlock = document.getElementById("reviewBlock");
-  const restartBtn = document.getElementById("restartBtn");
+    <section id="quizScreen" class="card hidden" aria-live="polite">
+      <div class="meta">
+        <div id="progressText"></div>
+        <div id="scoreSoFar"></div>
+      </div>
 
-  if (!Array.isArray(window.QUESTION_BANK) || window.QUESTION_BANK.length === 0) {
-    throw new Error("QUESTION_BANK is missing or empty. Check questions.js");
-  }
+      <div id="questionBlock" class="questionBlock"></div>
 
-  let selected = [];
-  let submitted = false;
+      <div class="actions">
+        <button id="nextBtn" class="primary" type="button" disabled>Finish</button>
+      </div>
+    </section>
 
-  function show(el) {
-    el.classList.remove("hidden");
-  }
-  function hide(el) {
-    el.classList.add("hidden");
-  }
+    <section id="resultScreen" class="card hidden" aria-live="polite">
+      <h2>Results</h2>
+      <p id="resultSummary"></p>
 
-  function shuffleInPlace(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }
+      <details class="review">
+        <summary>Review answers</summary>
+        <div id="reviewBlock"></div>
+      </details>
 
-  function pickRandom(bank, count) {
-    const copy = [...bank];
-    shuffleInPlace(copy);
-    return copy.slice(0, Math.min(count, copy.length));
-  }
+      <div class="actions">
+        <button id="restartBtn" type="button">Play Again</button>
+      </div>
+    </section>
 
-  function escapeHtml(str) {
-    return String(str)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
+    <footer class="footer">
+      <small>Hosted on GitHub Pages</small>
+    </footer>
+  </main>
 
-  function renderQuiz() {
-    submitted = false;
-    nextBtn.textContent = "Finish";
-    nextBtn.disabled = true;
-
-    const total = selected.length;
-    progressText.textContent = `Answer ${total} questions`;
-    scoreSoFar.textContent = `Pass mark: ${PASS_MIN_CORRECT} correct`;
-
-    questionBlock.innerHTML = selected
-      .map((q, idx) => {
-        const opts = q.options
-          .map((opt, optIdx) => {
-            return `
-              <label style="display:block; margin:6px 0;">
-                <input type="radio" name="${escapeHtml(q.id)}" value="${optIdx}">
-                ${escapeHtml(opt)}
-              </label>
-            `;
-          })
-          .join("");
-
-        return `
-          <div style="margin:16px 0; padding:12px; border:1px solid #ddd; border-radius:8px;">
-            <div style="margin-bottom:8px;"><strong>${idx + 1}.</strong> ${escapeHtml(q.q)}</div>
-            <div>${opts}</div>
-          </div>
-        `;
-      })
-      .join("");
-
-    // enable finish only when all questions answered
-    questionBlock.addEventListener("change", onAnyAnswerChange, { once: true });
-    questionBlock.addEventListener("change", onAnyAnswerChange);
-  }
-
-  function allAnswered() {
-    return selected.every((q) => {
-      return !!document.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`);
-    });
-  }
-
-  function onAnyAnswerChange() {
-    if (!submitted) nextBtn.disabled = !allAnswered();
-  }
-
-  function grade() {
-    let correct = 0;
-
-    const details = selected.map((q) => {
-      const checked = document.querySelector(
-        `input[name="${CSS.escape(q.id)}"]:checked`
-      );
-      const userIdx = checked ? Number(checked.value) : null;
-      const isCorrect = userIdx === q.answerIndex;
-      if (isCorrect) correct += 1;
-
-      return {
-        q: q.q,
-        userAnswer: userIdx === null ? "No answer" : q.options[userIdx],
-        correctAnswer: q.options[q.answerIndex],
-        isCorrect
-      };
-    });
-
-    return { correct, total: selected.length, details };
-  }
-
-  function lockInputs(lock) {
-    questionBlock.querySelectorAll('input[type="radio"]').forEach((i) => {
-      i.disabled = lock;
-    });
-  }
-
-  function showResults() {
-    const name = (nicknameInput.value || "").trim();
-    const { correct, total, details } = grade();
-    const passed = correct >= PASS_MIN_CORRECT;
-
-    resultSummary.innerHTML = `
-      ${name ? `Name: <strong>${escapeHtml(name)}</strong><br>` : ""}
-      Score: <strong>${correct}</strong> / <strong>${total}</strong><br>
-      Result: <strong>${passed ? "PASS" : "FAIL"}</strong> (pass mark: ${PASS_MIN_CORRECT})
-    `;
-
-    reviewBlock.innerHTML = details
-      .map((d, i) => {
-        return `
-          <div style="margin:12px 0; padding:10px; border:1px solid #eee; border-radius:8px;">
-            <div><strong>${i + 1}.</strong> ${escapeHtml(d.q)}</div>
-            <div>Your answer: <strong>${escapeHtml(d.userAnswer)}</strong></div>
-            <div>Correct answer: <strong>${escapeHtml(d.correctAnswer)}</strong></div>
-            <div>Status: <strong>${d.isCorrect ? "Correct" : "Incorrect"}</strong></div>
-          </div>
-        `;
-      })
-      .join("");
-
-    hide(startScreen);
-    hide(quizScreen);
-    show(resultScreen);
-  }
-
-  function startGame() {
-    selected = pickRandom(window.QUESTION_BANK, NUM_TO_SHOW);
-
-    hide(startScreen);
-    hide(resultScreen);
-    show(quizScreen);
-
-    renderQuiz();
-  }
-
-  startBtn.addEventListener("click", startGame);
-
-  nextBtn.addEventListener("click", () => {
-    if (nextBtn.disabled) return;
-    submitted = true;
-    lockInputs(true);
-    showResults();
-  });
-
-  restartBtn.addEventListener("click", () => {
-    // reset to start screen
-    hide(quizScreen);
-    hide(resultScreen);
-    show(startScreen);
-    questionBlock.innerHTML = "";
-    resultSummary.textContent = "";
-    reviewBlock.innerHTML = "";
-    nextBtn.disabled = true;
-  });
-})();
+  <script>
