@@ -1,8 +1,8 @@
 // app.js (nickname is NOT saved or loaded from localStorage)
 (function () {
-  const QUESTION_COUNT = 1;
+  const QUESTION_COUNT = 3;
   const BEST_SCORE_KEY = "rsq_best_percent_v1";
-  const PASS_MARK = 80;
+  const PASS_MARK = 60;
 
   function $(id) { return document.getElementById(id); }
 
