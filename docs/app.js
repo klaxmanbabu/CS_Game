@@ -1,124 +1,180 @@
-(() => {
-  const NUM_TO_SHOW = 3;
-  const PASS_MIN_CORRECT = 2;
+ (() => {
+      const NUM_TO_SHOW = 3;
+      const PASS_MIN_CORRECT = 2;
 
-  const quizEl = document.getElementById("quiz");
-  const submitBtn = document.getElementById("submitBtn");
-  const retryBtn = document.getElementById("retryBtn");
-  const resultEl = document.getElementById("result");
+      const startScreen = document.getElementById("startScreen");
+      const quizScreen = document.getElementById("quizScreen");
+      const resultScreen = document.getElementById("resultScreen");
 
-  if (!quizEl) throw new Error("Missing #quiz element");
-  if (!submitBtn) throw new Error("Missing #submitBtn element");
-  if (!retryBtn) throw new Error("Missing #retryBtn element");
-  if (!resultEl) throw new Error("Missing #result element");
-  if (!Array.isArray(window.QUESTION_BANK) || window.QUESTION_BANK.length === 0) {
-    throw new Error("window.QUESTION_BANK is missing or empty");
-  }
+      const nicknameInput = document.getElementById("nickname");
+      const startBtn = document.getElementById("startBtn");
 
-  let selectedQuestions = [];
+      const progressText = document.getElementById("progressText");
+      const scoreSoFar = document.getElementById("scoreSoFar");
+      const questionBlock = document.getElementById("questionBlock");
+      const nextBtn = document.getElementById("nextBtn");
 
-  function shuffleInPlace(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }
+      const resultSummary = document.getElementById("resultSummary");
+      const reviewBlock = document.getElementById("reviewBlock");
+      const restartBtn = document.getElementById("restartBtn");
 
-  function pickRandomQuestions(bank, count) {
-    const copy = [...bank];
-    shuffleInPlace(copy);
-    return copy.slice(0, Math.min(count, copy.length));
-  }
+      if (!Array.isArray(window.QUESTION_BANK) || window.QUESTION_BANK.length === 0) {
+        throw new Error("QUESTION_BANK is missing or empty.");
+      }
 
-  function escapeHtml(str) {
-    return String(str)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
+      let selected = [];
+      let submitted = false;
 
-  function renderQuestions(questions) {
-    // Important: build once, set once (do not overwrite per question in a loop)
-    const html = questions
-      .map((q, idx) => {
-        const opts = q.options
-          .map((opt, optIdx) => {
+      function show(el) { el.classList.remove("hidden"); }
+      function hide(el) { el.classList.add("hidden"); }
+
+      function shuffleInPlace(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      function pickRandom(bank, count) {
+        const copy = [...bank];
+        shuffleInPlace(copy);
+        return copy.slice(0, Math.min(count, copy.length));
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function allAnswered() {
+        return selected.every((q) => {
+          return !!document.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`);
+        });
+      }
+
+      function onAnyAnswerChange() {
+        if (!submitted) nextBtn.disabled = !allAnswered();
+      }
+
+      function renderQuiz() {
+        submitted = false;
+        nextBtn.textContent = "Finish";
+        nextBtn.disabled = true;
+
+        progressText.textContent = `Questions: ${selected.length}`;
+        scoreSoFar.textContent = `Pass mark: at least ${PASS_MIN_CORRECT} correct`;
+
+        questionBlock.innerHTML = selected
+          .map((q, idx) => {
+            const opts = q.options
+              .map((opt, optIdx) => `
+                <label style="display:block; margin:6px 0;">
+                  <input type="radio" name="${escapeHtml(q.id)}" value="${optIdx}">
+                  ${escapeHtml(opt)}
+                </label>
+              `)
+              .join("");
+
             return `
-              <label class="quiz-option" style="display:block; margin:6px 0;">
-                <input type="radio" name="${escapeHtml(q.id)}" value="${optIdx}">
-                ${escapeHtml(opt)}
-              </label>
+              <div style="margin:16px 0; padding:12px; border:1px solid #ddd; border-radius:8px;">
+                <div style="margin-bottom:8px;"><strong>${idx + 1}.</strong> ${escapeHtml(q.q)}</div>
+                <div>${opts}</div>
+              </div>
             `;
           })
           .join("");
 
-        return `
-          <div class="quiz-question" style="margin:16px 0; padding:12px; border:1px solid #ddd; border-radius:8px;">
-            <div style="margin-bottom:8px;"><strong>${idx + 1}.</strong> ${escapeHtml(q.q)}</div>
-            <div class="quiz-options">${opts}</div>
-          </div>
+        questionBlock.addEventListener("change", onAnyAnswerChange);
+      }
+
+      function grade() {
+        let correct = 0;
+
+        const details = selected.map((q) => {
+          const checked = document.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`);
+          const userIdx = checked ? Number(checked.value) : null;
+          const isCorrect = userIdx === q.answerIndex;
+          if (isCorrect) correct += 1;
+
+          return {
+            q: q.q,
+            userAnswer: userIdx === null ? "No answer" : q.options[userIdx],
+            correctAnswer: q.options[q.answerIndex],
+            isCorrect
+          };
+        });
+
+        return { correct, total: selected.length, details };
+      }
+
+      function lockInputs(lock) {
+        questionBlock.querySelectorAll('input[type="radio"]').forEach((i) => {
+          i.disabled = lock;
+        });
+      }
+
+      function showResults() {
+        const name = (nicknameInput.value || "").trim();
+        const { correct, total, details } = grade();
+        const passed = correct >= PASS_MIN_CORRECT;
+
+        resultSummary.innerHTML = `
+          ${name ? `Name: <strong>${escapeHtml(name)}</strong><br>` : ""}
+          Score: <strong>${correct}</strong> / <strong>${total}</strong><br>
+          Result: <strong>${passed ? "PASS" : "FAIL"}</strong>
         `;
-      })
-      .join("");
 
-    quizEl.innerHTML = html;
+        reviewBlock.innerHTML = details
+          .map((d, i) => `
+            <div style="margin:12px 0; padding:10px; border:1px solid #eee; border-radius:8px;">
+              <div><strong>${i + 1}.</strong> ${escapeHtml(d.q)}</div>
+              <div>Your answer: <strong>${escapeHtml(d.userAnswer)}</strong></div>
+              <div>Correct answer: <strong>${escapeHtml(d.correctAnswer)}</strong></div>
+              <div>Status: <strong>${d.isCorrect ? "Correct" : "Incorrect"}</strong></div>
+            </div>
+          `)
+          .join("");
 
-    resultEl.textContent = "";
-    retryBtn.style.display = "none";
-    submitBtn.disabled = false;
+        hide(startScreen);
+        hide(quizScreen);
+        show(resultScreen);
+      }
 
-    // re-enable inputs
-    quizEl.querySelectorAll('input[type="radio"]').forEach((i) => (i.disabled = false));
-  }
+      function startGame() {
+        selected = pickRandom(window.QUESTION_BANK, NUM_TO_SHOW);
 
-  function getUserAnswerIndex(questionId) {
-    const checked = document.querySelector(
-      `input[name="${CSS.escape(questionId)}"]:checked`
-    );
-    if (!checked) return null;
-    const n = Number(checked.value);
-    return Number.isFinite(n) ? n : null;
-  }
+        hide(startScreen);
+        hide(resultScreen);
+        show(quizScreen);
 
-  function gradeQuiz(questions) {
-    let correct = 0;
+        renderQuiz();
+      }
 
-    for (const q of questions) {
-      const userIdx = getUserAnswerIndex(q.id);
-      if (userIdx === q.answerIndex) correct += 1;
-    }
+      startBtn.addEventListener("click", startGame);
 
-    return { correct, total: questions.length };
-  }
+      nextBtn.addEventListener("click", () => {
+        if (nextBtn.disabled) return;
+        submitted = true;
+        lockInputs(true);
+        showResults();
+      });
 
-  function lockInputs(lock) {
-    quizEl.querySelectorAll('input[type="radio"]').forEach((i) => (i.disabled = lock));
-  }
+      restartBtn.addEventListener("click", () => {
+        hide(quizScreen);
+        hide(resultScreen);
+        show(startScreen);
 
-  function startNewQuiz() {
-    selectedQuestions = pickRandomQuestions(window.QUESTION_BANK, NUM_TO_SHOW);
-    renderQuestions(selectedQuestions);
-  }
-
-  submitBtn.addEventListener("click", () => {
-    const { correct, total } = gradeQuiz(selectedQuestions);
-    const passed = correct >= PASS_MIN_CORRECT;
-
-    lockInputs(true);
-    submitBtn.disabled = true;
-
-    resultEl.innerHTML = `
-      <p>Score: <strong>${correct}</strong> / <strong>${total}</strong></p>
-      <p>Result: <strong>${passed ? "PASS" : "FAIL"}</strong> (pass mark: ${PASS_MIN_CORRECT})</p>
-    `;
-
-    retryBtn.style.display = "inline-block";
-  });
-
-  retryBtn.addEventListener("click", startNewQuiz);
-
-  startNewQuiz();
-})();
+        questionBlock.innerHTML = "";
+        resultSummary.textContent = "";
+        reviewBlock.innerHTML = "";
+        nextBtn.disabled = true;
+      });
+    })();
+  </script>
+</body>
+</html>
