@@ -2,7 +2,7 @@
   const QUESTION_COUNT = 5;
   const BEST_SCORE_KEY = "rsq_best_percent_v1";
   const NICKNAME_KEY = "rsq_nickname_v1";
-  const PASS_MARK = 60;
+  const PASS_MARK = 80;
 
   function $(id) { return document.getElementById(id); }
 
