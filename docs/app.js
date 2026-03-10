@@ -1,13 +1,3 @@
-/* Quiz script
-   - Randomly shows 3 questions from window.QUESTION_BANK
-   - Pass mark: at least 2 correct
-   - Requires HTML elements:
-       <div id="quiz"></div>
-       <button id="submitBtn">Submit</button>
-       <button id="retryBtn" style="display:none;">Try again</button>
-       <div id="result"></div>
-*/
-
 (() => {
   const NUM_TO_SHOW = 3;
   const PASS_MIN_CORRECT = 2;
@@ -17,14 +7,12 @@
   const retryBtn = document.getElementById("retryBtn");
   const resultEl = document.getElementById("result");
 
-  if (!quizEl || !submitBtn || !retryBtn || !resultEl) {
-    throw new Error(
-      "Missing required elements: #quiz, #submitBtn, #retryBtn, #result"
-    );
-  }
-
-  if (!Array.isArray(window.QUESTION_BANK) || window.QUESTION_BANK.length < 1) {
-    throw new Error("window.QUESTION_BANK is missing or empty.");
+  if (!quizEl) throw new Error("Missing #quiz element");
+  if (!submitBtn) throw new Error("Missing #submitBtn element");
+  if (!retryBtn) throw new Error("Missing #retryBtn element");
+  if (!resultEl) throw new Error("Missing #result element");
+  if (!Array.isArray(window.QUESTION_BANK) || window.QUESTION_BANK.length === 0) {
+    throw new Error("window.QUESTION_BANK is missing or empty");
   }
 
   let selectedQuestions = [];
@@ -53,34 +41,37 @@
   }
 
   function renderQuestions(questions) {
-    quizEl.innerHTML = questions
+    // Important: build once, set once (do not overwrite per question in a loop)
+    const html = questions
       .map((q, idx) => {
-        const optionsHtml = q.options
+        const opts = q.options
           .map((opt, optIdx) => {
-            const optSafe = escapeHtml(opt);
             return `
-              <label class="quiz-option">
+              <label class="quiz-option" style="display:block; margin:6px 0;">
                 <input type="radio" name="${escapeHtml(q.id)}" value="${optIdx}">
-                ${optSafe}
+                ${escapeHtml(opt)}
               </label>
             `;
           })
           .join("");
 
         return `
-          <div class="quiz-question" data-qid="${escapeHtml(q.id)}">
-            <p><strong>${idx + 1}.</strong> ${escapeHtml(q.q)}</p>
-            <div class="quiz-options">
-              ${optionsHtml}
-            </div>
+          <div class="quiz-question" style="margin:16px 0; padding:12px; border:1px solid #ddd; border-radius:8px;">
+            <div style="margin-bottom:8px;"><strong>${idx + 1}.</strong> ${escapeHtml(q.q)}</div>
+            <div class="quiz-options">${opts}</div>
           </div>
         `;
       })
       .join("");
 
+    quizEl.innerHTML = html;
+
     resultEl.textContent = "";
     retryBtn.style.display = "none";
     submitBtn.disabled = false;
+
+    // re-enable inputs
+    quizEl.querySelectorAll('input[type="radio"]').forEach((i) => (i.disabled = false));
   }
 
   function getUserAnswerIndex(questionId) {
@@ -94,54 +85,40 @@
 
   function gradeQuiz(questions) {
     let correct = 0;
-    const details = questions.map((q) => {
+
+    for (const q of questions) {
       const userIdx = getUserAnswerIndex(q.id);
-      const isCorrect = userIdx === q.answerIndex;
-      if (isCorrect) correct += 1;
-      return { id: q.id, isCorrect, userIdx };
-    });
-    return { correct, total: questions.length, details };
+      if (userIdx === q.answerIndex) correct += 1;
+    }
+
+    return { correct, total: questions.length };
   }
 
   function lockInputs(lock) {
-    const inputs = quizEl.querySelectorAll('input[type="radio"]');
-    inputs.forEach((i) => (i.disabled = lock));
-  }
-
-  function showResult(correct, total) {
-    const passed = correct >= PASS_MIN_CORRECT;
-
-    resultEl.innerHTML = `
-      <p>
-        Score: <strong>${correct}</strong> / <strong>${total}</strong>
-        (Pass mark: at least <strong>${PASS_MIN_CORRECT}</strong> correct)
-      </p>
-      <p>
-        Result: <strong>${passed ? "PASS" : "FAIL"}</strong>
-      </p>
-    `;
-
-    retryBtn.style.display = "inline-block";
+    quizEl.querySelectorAll('input[type="radio"]').forEach((i) => (i.disabled = lock));
   }
 
   function startNewQuiz() {
     selectedQuestions = pickRandomQuestions(window.QUESTION_BANK, NUM_TO_SHOW);
     renderQuestions(selectedQuestions);
-    lockInputs(false);
   }
 
   submitBtn.addEventListener("click", () => {
     const { correct, total } = gradeQuiz(selectedQuestions);
+    const passed = correct >= PASS_MIN_CORRECT;
 
     lockInputs(true);
     submitBtn.disabled = true;
 
-    showResult(correct, total);
+    resultEl.innerHTML = `
+      <p>Score: <strong>${correct}</strong> / <strong>${total}</strong></p>
+      <p>Result: <strong>${passed ? "PASS" : "FAIL"}</strong> (pass mark: ${PASS_MIN_CORRECT})</p>
+    `;
+
+    retryBtn.style.display = "inline-block";
   });
 
-  retryBtn.addEventListener("click", () => {
-    startNewQuiz();
-  });
+  retryBtn.addEventListener("click", startNewQuiz);
 
   startNewQuiz();
 })();
