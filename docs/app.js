@@ -1,180 +1,209 @@
- (() => {
-      const NUM_TO_SHOW = 3;
-      const PASS_MIN_CORRECT = 2;
+ (function () {
+  const QUESTION_COUNT = 6;
+  const BEST_SCORE_KEY = "rsq_best_percent_v1";
+  const NICKNAME_KEY = "rsq_nickname_v1";
+  const PASS_MARK = 80;
 
-      const startScreen = document.getElementById("startScreen");
-      const quizScreen = document.getElementById("quizScreen");
-      const resultScreen = document.getElementById("resultScreen");
+  function $(id) { return document.getElementById(id); }
 
-      const nicknameInput = document.getElementById("nickname");
-      const startBtn = document.getElementById("startBtn");
+  const els = {
+    startScreen: $("startScreen"),
+    quizScreen: $("quizScreen"),
+    resultScreen: $("resultScreen"),
+    startBtn: $("startBtn"),
+    nextBtn: $("nextBtn"),
+    restartBtn: $("restartBtn"),
+    nickname: $("nickname"),
+    questionBlock: $("questionBlock"),
+    progressText: $("progressText"),
+    scoreSoFar: $("scoreSoFar"),
+    resultSummary: $("resultSummary"),
+    reviewBlock: $("reviewBlock")
+  };
 
-      const progressText = document.getElementById("progressText");
-      const scoreSoFar = document.getElementById("scoreSoFar");
-      const questionBlock = document.getElementById("questionBlock");
-      const nextBtn = document.getElementById("nextBtn");
+  const required = ["startScreen","quizScreen","resultScreen","startBtn","nextBtn","restartBtn","questionBlock","progressText","scoreSoFar","resultSummary","reviewBlock"];
+  const missing = required.filter(k => !els[k]);
+  if (missing.length) {
+    console.error("Quiz init failed. Missing element IDs:", missing);
+    return;
+  }
 
-      const resultSummary = document.getElementById("resultSummary");
-      const reviewBlock = document.getElementById("reviewBlock");
-      const restartBtn = document.getElementById("restartBtn");
+  const bank = Array.isArray(window.QUESTION_BANK) ? window.QUESTION_BANK : [];
+  if (!bank.length) {
+    els.startBtn.disabled = true;
+    els.startScreen.insertAdjacentHTML("beforeend", `<p class="hint">Question bank not found. Check questions.js.</p>`);
+    return;
+  }
 
-      if (!Array.isArray(window.QUESTION_BANK) || window.QUESTION_BANK.length === 0) {
-        throw new Error("QUESTION_BANK is missing or empty.");
-      }
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function pickN(arr, n) { return shuffle(arr).slice(0, Math.min(n, arr.length)); }
+  function show(el) { el.classList.remove("hidden"); }
+  function hide(el) { el.classList.add("hidden"); }
 
-      let selected = [];
-      let submitted = false;
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
 
-      function show(el) { el.classList.remove("hidden"); }
-      function hide(el) { el.classList.add("hidden"); }
+  function getBestPercent() {
+    const raw = localStorage.getItem(BEST_SCORE_KEY);
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+  function setBestPercent(p) { localStorage.setItem(BEST_SCORE_KEY, String(p)); }
 
-      function shuffleInPlace(arr) {
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr;
-      }
+  function getNickname() { return (localStorage.getItem(NICKNAME_KEY) || "").trim(); }
+  function setNickname(n) { localStorage.setItem(NICKNAME_KEY, (n || "").trim()); }
 
-      function pickRandom(bank, count) {
-        const copy = [...bank];
-        shuffleInPlace(copy);
-        return copy.slice(0, Math.min(count, copy.length));
-      }
+  function bestLineHtml() {
+    const best = getBestPercent();
+    return best === null ? `<div><strong>Best:</strong> Not set</div>` : `<div><strong>Best:</strong> ${best}%</div>`;
+  }
 
-      function escapeHtml(str) {
-        return String(str)
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#039;");
-      }
+  let quiz = { questions: [], index: 0, answers: new Map() };
 
-      function allAnswered() {
-        return selected.every((q) => {
-          return !!document.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`);
-        });
-      }
+  function startQuiz() {
+    try {
+      setNickname(els.nickname ? els.nickname.value : "");
+      quiz.questions = pickN(bank, QUESTION_COUNT);
+      quiz.index = 0;
+      quiz.answers = new Map();
 
-      function onAnyAnswerChange() {
-        if (!submitted) nextBtn.disabled = !allAnswered();
-      }
+      hide(els.startScreen);
+      hide(els.resultScreen);
+      show(els.quizScreen);
 
-      function renderQuiz() {
-        submitted = false;
-        nextBtn.textContent = "Finish";
-        nextBtn.disabled = true;
+      renderQuestion();
+    } catch (e) {
+      console.error("Start quiz error:", e);
+      alert("Something went wrong starting the quiz. Please refresh and try again.");
+    }
+  }
 
-        progressText.textContent = `Questions: ${selected.length}`;
-        scoreSoFar.textContent = `Pass mark: at least ${PASS_MIN_CORRECT} correct`;
+  function renderQuestion() {
+    const qObj = quiz.questions[quiz.index];
+    if (!qObj) return;
 
-        questionBlock.innerHTML = selected
-          .map((q, idx) => {
-            const opts = q.options
-              .map((opt, optIdx) => `
-                <label style="display:block; margin:6px 0;">
-                  <input type="radio" name="${escapeHtml(q.id)}" value="${optIdx}">
-                  ${escapeHtml(opt)}
-                </label>
-              `)
-              .join("");
+    els.nextBtn.disabled = true;
 
-            return `
-              <div style="margin:16px 0; padding:12px; border:1px solid #ddd; border-radius:8px;">
-                <div style="margin-bottom:8px;"><strong>${idx + 1}.</strong> ${escapeHtml(q.q)}</div>
-                <div>${opts}</div>
-              </div>
-            `;
-          })
-          .join("");
+    const chosen = quiz.answers.get(qObj.id);
 
-        questionBlock.addEventListener("change", onAnyAnswerChange);
-      }
+    els.progressText.textContent = `Question ${quiz.index + 1} of ${quiz.questions.length}`;
+    els.scoreSoFar.innerHTML = `
+      <div>Answered: ${quiz.answers.size}/${quiz.questions.length}</div>
+      ${bestLineHtml()}
+    `;
 
-      function grade() {
-        let correct = 0;
+    const optionsHtml = qObj.options.map((opt, idx) => {
+      const checked = chosen === idx ? "checked" : "";
+      return `
+        <label class="option">
+          <input type="radio" name="opt" value="${idx}" ${checked} />
+          <span>${escapeHtml(opt)}</span>
+        </label>
+      `;
+    }).join("");
 
-        const details = selected.map((q) => {
-          const checked = document.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`);
-          const userIdx = checked ? Number(checked.value) : null;
-          const isCorrect = userIdx === q.answerIndex;
-          if (isCorrect) correct += 1;
+    els.questionBlock.innerHTML = `
+      <h2>${escapeHtml(qObj.q)}</h2>
+      <div class="options">${optionsHtml}</div>
+    `;
 
-          return {
-            q: q.q,
-            userAnswer: userIdx === null ? "No answer" : q.options[userIdx],
-            correctAnswer: q.options[q.answerIndex],
-            isCorrect
-          };
-        });
-
-        return { correct, total: selected.length, details };
-      }
-
-      function lockInputs(lock) {
-        questionBlock.querySelectorAll('input[type="radio"]').forEach((i) => {
-          i.disabled = lock;
-        });
-      }
-
-      function showResults() {
-        const name = (nicknameInput.value || "").trim();
-        const { correct, total, details } = grade();
-        const passed = correct >= PASS_MIN_CORRECT;
-
-        resultSummary.innerHTML = `
-          ${name ? `Name: <strong>${escapeHtml(name)}</strong><br>` : ""}
-          Score: <strong>${correct}</strong> / <strong>${total}</strong><br>
-          Result: <strong>${passed ? "PASS" : "FAIL"}</strong>
-        `;
-
-        reviewBlock.innerHTML = details
-          .map((d, i) => `
-            <div style="margin:12px 0; padding:10px; border:1px solid #eee; border-radius:8px;">
-              <div><strong>${i + 1}.</strong> ${escapeHtml(d.q)}</div>
-              <div>Your answer: <strong>${escapeHtml(d.userAnswer)}</strong></div>
-              <div>Correct answer: <strong>${escapeHtml(d.correctAnswer)}</strong></div>
-              <div>Status: <strong>${d.isCorrect ? "Correct" : "Incorrect"}</strong></div>
-            </div>
-          `)
-          .join("");
-
-        hide(startScreen);
-        hide(quizScreen);
-        show(resultScreen);
-      }
-
-      function startGame() {
-        selected = pickRandom(window.QUESTION_BANK, NUM_TO_SHOW);
-
-        hide(startScreen);
-        hide(resultScreen);
-        show(quizScreen);
-
-        renderQuiz();
-      }
-
-      startBtn.addEventListener("click", startGame);
-
-      nextBtn.addEventListener("click", () => {
-        if (nextBtn.disabled) return;
-        submitted = true;
-        lockInputs(true);
-        showResults();
+    els.questionBlock.querySelectorAll('input[name="opt"]').forEach((r) => {
+      r.addEventListener("change", (e) => {
+        quiz.answers.set(qObj.id, Number(e.target.value));
+        els.nextBtn.disabled = false;
       });
+    });
 
-      restartBtn.addEventListener("click", () => {
-        hide(quizScreen);
-        hide(resultScreen);
-        show(startScreen);
+    if (typeof chosen === "number") els.nextBtn.disabled = false;
+    els.nextBtn.textContent = (quiz.index === quiz.questions.length - 1) ? "Finish" : "Next";
+  }
 
-        questionBlock.innerHTML = "";
-        resultSummary.textContent = "";
-        reviewBlock.innerHTML = "";
-        nextBtn.disabled = true;
-      });
-    })();
-  </script>
-</body>
-</html>
+  function finishQuiz() {
+    const total = quiz.questions.length;
+    let correct = 0;
+
+    const reviewItems = quiz.questions.map((q) => {
+      const selected = quiz.answers.get(q.id);
+      const isCorrect = selected === q.answerIndex;
+      if (isCorrect) correct += 1;
+      return {
+        q: q.q,
+        selectedText: (typeof selected === "number") ? q.options[selected] : "No answer",
+        correctText: q.options[q.answerIndex],
+        isCorrect
+      };
+    });
+
+    const percent = total ? Math.round((correct / total) * 100) : 0;
+    const passed = percent >= PASS_MARK;
+
+    const prevBest = getBestPercent();
+    if (prevBest === null || percent > prevBest) setBestPercent(percent);
+
+    const nick = getNickname();
+    const whoLine = nick ? `<strong>Player:</strong> ${escapeHtml(nick)}<br />` : "";
+
+    els.resultSummary.innerHTML = `
+      ${whoLine}
+      <strong>Score:</strong> ${correct}/${total} (${percent}%)
+      <span class="badge ${passed ? "pass" : "fail"}">${passed ? "PASS" : "FAIL"}</span><br />
+      <strong>Pass mark:</strong> ${PASS_MARK}%<br />
+      <strong>Best:</strong> ${getBestPercent()}%
+    `;
+
+    els.reviewBlock.innerHTML = reviewItems.map((it, i) => `
+      <div class="reviewItem">
+        <div><strong>Q${i + 1}.</strong> ${escapeHtml(it.q)}
+          <span class="badge ${it.isCorrect ? "pass" : "fail"}">${it.isCorrect ? "Correct" : "Incorrect"}</span>
+        </div>
+        <div><strong>Your answer:</strong> ${escapeHtml(it.selectedText)}</div>
+        <div><strong>Correct answer:</strong> ${escapeHtml(it.correctText)}</div>
+      </div>
+    `).join("");
+
+    hide(els.quizScreen);
+    show(els.resultScreen);
+  }
+
+  function next() {
+    const qObj = quiz.questions[quiz.index];
+    if (!qObj) return;
+    if (!quiz.answers.has(qObj.id)) return;
+
+    if (quiz.index === quiz.questions.length - 1) {
+      finishQuiz();
+      return;
+    }
+    quiz.index += 1;
+    renderQuestion();
+  }
+
+  function restart() {
+    hide(els.resultScreen);
+    hide(els.quizScreen);
+    if (els.nickname) els.nickname.value = getNickname();
+    show(els.startScreen);
+  }
+
+  // Wire up
+  els.startBtn.addEventListener("click", startQuiz);
+  els.nextBtn.addEventListener("click", next);
+  els.restartBtn.addEventListener("click", restart);
+
+  // Initialize start screen nickname + best
+  if (els.nickname) els.nickname.value = getNickname();
+  els.startScreen.insertAdjacentHTML("beforeend", `<p class="hint">${bestLineHtml()}</p>`);
+})();
